@@ -148,8 +148,9 @@
       document.getElementById('modalLoader').style.display = 'none';
       const episodes = data.episodes || [];
 
-      if (data.notice) {
+      if (data.notice && source === 'anilist') {
         document.getElementById('episodesList').innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:15px;">${data.notice}</div>`;
+        return;
       }
 
       if (episodes.length === 0) {
@@ -172,6 +173,10 @@
   }
 
   async function playEpisode(epNum, epUrl, btnElement) {
+    if (currentSource === 'anilist') {
+      alert('مصدر AniList يوفر معلومات الأنمي والحلقات فقط، ولا يوفر ملفات فيديو للمشاهدة.');
+      return;
+    }
     document.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
     if(btnElement) btnElement.classList.add('active');
 

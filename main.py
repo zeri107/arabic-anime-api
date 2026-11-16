@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 import urllib.parse
 import requests
 import re
+import json
+from pathlib import Path
 
 app = FastAPI(title="Multi-Source Arabic Anime API")
 
@@ -24,6 +26,79 @@ HEADERS = {
 scraper = cloudscraper.create_scraper(
     browser={"browser": "chrome", "platform": "windows", "desktop": True}
 )
+
+VIDEOS_FILE = Path(__file__).with_name("videos.json")
+
+
+def load_videos():
+    """تحميل روابط الفيديو اليدوية، مع إرجاع كائن فارغ إذا لم يوجد الملف."""
+    try:
+        if not VIDEOS_FILE.exists():
+            return {}
+        return json.loads(VIDEOS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print("videos.json error:", exc)
+        return {}
+
+
+def valid_url(url):
+    return isinstance(url, str) and (url.startswith("https://") or url.startswith("http://"))
+
+
+def episode_config(anime_id, episode_number):
+    item = load_videos().get(str(anime_id), {}).get(str(episode_number))
+    if not isinstance(item, dict):
+        return None
+    # دعم الصيغة القديمة ذات url واحد، لتبقى الملفات السابقة صالحة.
+    if item.get("url"):
+        item = {**item, "servers": [{
+            "name": item.get("name", "السيرفر الأساسي"),
+            "url": item.get("url"),
+            "type": item.get("type", "mp4"),
+            "quality": item.get("quality", "غير محدد"),
+            "download": bool(item.get("download", False)),
+        }]}
+    servers = []
+    for server in item.get("servers", []):
+        if not isinstance(server, dict) or not valid_url(server.get("url")):
+            continue
+        video_type = str(server.get("type", "mp4")).lower()
+        if video_type not in {"mp4", "iframe"}:
+            continue
+        servers.append({
+            "name": server.get("name", "سيرفر"),
+            "url": server["url"],
+            "type": video_type,
+            "quality": server.get("quality", "غير محدد"),
+            "download": bool(server.get("download", False)),
+        })
+    subtitles = [
+        {"label": s.get("label", "العربية"), "url": s.get("url"),
+         "srclang": s.get("srclang", "ar"), "default": bool(s.get("default", False))}
+        for s in item.get("subtitles", [])
+        if isinstance(s, dict) and valid_url(s.get("url"))
+    ]
+    return {"title": item.get("title", ""), "servers": servers, "subtitles": subtitles}
+
+
+def manual_video(anime_id, episode_number, server_name=None, quality=None):
+    config = episode_config(anime_id, episode_number)
+    if not config:
+        return None
+    servers = config["servers"]
+    if server_name:
+        servers = [s for s in servers if s["name"] == server_name]
+    if quality:
+        matching = [s for s in servers if s["quality"] == quality]
+        if matching:
+            servers = matching
+    if not servers:
+        return None
+    selected = servers[0]
+    return {"video_url": selected["url"], "type": selected["type"],
+            "quality": selected["quality"], "server": selected["name"],
+            "download": selected["download"], "subtitles": config["subtitles"],
+            "servers": config["servers"]}
 
 
 def search_anime3rb(q):
@@ -155,13 +230,21 @@ def get_episodes(source: str, anime_id: str):
             )
             response.raise_for_status()
             total = (response.json().get("data", {}).get("Media") or {}).get("episodes") or 0
+            episodes = []
+            for number in range(1, int(total) + 1):
+                episode = {"number": str(number), "url": ""}
+                config = episode_config(anime_id, number)
+                if config and config["servers"]:
+                    episode.update({
+                        "available": True,
+                        "server_count": len(config["servers"]),
+                        "subtitle_count": len(config["subtitles"]),
+                    })
+                episodes.append(episode)
             return {
                 "anime_id": anime_id,
-                "episodes": [
-                    {"number": str(number), "url": ""}
-                    for number in range(1, int(total) + 1)
-                ],
-                "notice": "نتائج AniList تعرض معلومات الأنمي والحلقات فقط ولا توفر روابط مشاهدة."
+                "episodes": episodes,
+                "notice": "تُشغّل الحلقات التي لها روابط قانونية في videos.json فقط."
             }
 
         if source == "anime4up":
@@ -187,9 +270,10 @@ def get_episodes(source: str, anime_id: str):
 
 
 @app.get("/watch/{source}/{anime_id}/{ep_num}")
-def watch_episode(source: str, anime_id: str, ep_num: str):
+def watch_episode(source: str, anime_id: str, ep_num: str, server: str | None = None, quality: str | None = None):
     if source == "anilist":
-        return {"error": "مصدر AniList يعرض معلومات الأنمي فقط ولا يوفر روابط مشاهدة."}
+        video = manual_video(anime_id, ep_num, server, quality)
+        return video or {"error": "لا يوجد رابط فيديو قانوني لهذه الحلقة في videos.json."}
     try:
         if source == "anime4up":
             url = f"https://anime4up.cam/episode/{anime_id}-الحلقة-{ep_num}/"

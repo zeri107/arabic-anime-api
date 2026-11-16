@@ -1,0 +1,31 @@
+{
+  "20": {
+    "1": {
+      "title": "Naruto - الحلقة 1",
+      "servers": [
+        {
+          "name": "CDN الأساسي",
+          "url": "https://cdn.example.com/anime/naruto/episode-1-720p.mp4",
+          "type": "mp4",
+          "quality": "720p",
+          "download": true
+        },
+        {
+          "name": "CDN الاحتياطي",
+          "url": "https://backup.example.com/anime/naruto/episode-1-1080p.mp4",
+          "type": "mp4",
+          "quality": "1080p",
+          "download": false
+        }
+      ],
+      "subtitles": [
+        {
+          "label": "العربية",
+          "url": "https://cdn.example.com/subtitles/naruto/episode-1-ar.vtt",
+          "srclang": "ar",
+          "default": true
+        }
+      ]
+    }
+  }
+}

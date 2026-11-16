@@ -81,28 +81,42 @@ def search_anime4up(q):
         return []
 
 
-def search_jikan(q):
-    """احتياطي موثوق للبحث. يعرض بيانات الأنمي، لكن ليس روابط مشاهدة."""
+def search_anilist(q):
+    """مصدر احتياطي للبحث باستخدام AniList GraphQL."""
     try:
-        response = requests.get(
-            "https://api.jikan.moe/v4/anime",
-            params={"q": q, "limit": 12},
-            headers=HEADERS,
+        query = """
+        query ($search: String) {
+          Page(perPage: 12) {
+            media(search: $search, type: ANIME) {
+              id
+              title { romaji english native }
+              coverImage { large }
+            }
+          }
+        }
+        """
+        response = requests.post(
+            "https://graphql.anilist.co",
+            json={"query": query, "variables": {"search": q}},
+            headers={**HEADERS, "Content-Type": "application/json"},
             timeout=30,
         )
         response.raise_for_status()
-        items = response.json().get("data", [])
+        items = response.json().get("data", {}).get("Page", {}).get("media", [])
         return [
             {
-                "id": str(item["mal_id"]),
-                "title": item.get("title") or item.get("title_english") or "بدون عنوان",
-                "poster": (item.get("images", {}).get("jpg", {}) or {}).get("large_image_url", ""),
-                "source": "jikan",
+                "id": str(item["id"]),
+                "title": (item.get("title", {}).get("english")
+                          or item.get("title", {}).get("romaji")
+                          or item.get("title", {}).get("native")
+                          or "بدون عنوان"),
+                "poster": (item.get("coverImage") or {}).get("large", ""),
+                "source": "anilist",
             }
             for item in items
         ]
     except Exception as exc:
-        print("Jikan search error:", exc)
+        print("AniList search error:", exc)
         return []
 
 
@@ -120,29 +134,34 @@ def search_anime(q: str):
     if not results:
         results = search_anime4up(q)
     if not results:
-        results = search_jikan(q)
+        results = search_anilist(q)
     return {"results": results}
 
 
 @app.get("/episodes/{source}/{anime_id}")
 def get_episodes(source: str, anime_id: str):
     try:
-        if source == "jikan":
-            response = requests.get(
-                f"https://api.jikan.moe/v4/anime/{anime_id}/episodes",
-                headers=HEADERS,
+        if source == "anilist":
+            query = """
+            query ($id: Int) {
+              Media(id: $id, type: ANIME) { episodes }
+            }
+            """
+            response = requests.post(
+                "https://graphql.anilist.co",
+                json={"query": query, "variables": {"id": int(anime_id)}},
+                headers={**HEADERS, "Content-Type": "application/json"},
                 timeout=30,
             )
             response.raise_for_status()
-            episodes = response.json().get("data", [])
+            total = (response.json().get("data", {}).get("Media") or {}).get("episodes") or 0
             return {
                 "anime_id": anime_id,
                 "episodes": [
-                    {"number": str(ep.get("mal_id")), "url": ""}
-                    for ep in episodes
-                    if ep.get("mal_id") is not None
+                    {"number": str(number), "url": ""}
+                    for number in range(1, int(total) + 1)
                 ],
-                "notice": "هذا المصدر يعرض معلومات الحلقات فقط ولا يوفر روابط مشاهدة."
+                "notice": "نتائج AniList تعرض معلومات الأنمي والحلقات فقط ولا توفر روابط مشاهدة."
             }
 
         if source == "anime4up":
@@ -169,8 +188,8 @@ def get_episodes(source: str, anime_id: str):
 
 @app.get("/watch/{source}/{anime_id}/{ep_num}")
 def watch_episode(source: str, anime_id: str, ep_num: str):
-    if source == "jikan":
-        return {"error": "مصدر Jikan يعرض معلومات الأنمي فقط ولا يوفر روابط مشاهدة."}
+    if source == "anilist":
+        return {"error": "مصدر AniList يعرض معلومات الأنمي فقط ولا يوفر روابط مشاهدة."}
     try:
         if source == "anime4up":
             url = f"https://anime4up.cam/episode/{anime_id}-الحلقة-{ep_num}/"

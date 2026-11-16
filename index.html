@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>أنمي هيفن | النسخة العربية</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  :root {
+    --bg-body: #f8fafc; --bg-surface: #ffffff; --text-main: #0f172a; --text-muted: #64748b;
+    --primary: #2563eb; --accent: #f59e0b; --danger: #ef4444;
+    --border: #e2e8f0; --radius-md: 16px; --radius-lg: 24px;
+    --shadow-sm: 0 4px 6px -1px rgba(0,0,0,0.05); --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; font-family: 'Tajawal', sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg-body); color: var(--text-main); min-height: 100vh; padding-bottom: 50px; }
+  
+  .top-nav { position: sticky; top: 0; height: 70px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; z-index: 1000; border-bottom: 1px solid var(--border); }
+  .logo { font-size: 24px; font-weight: 900; color: var(--primary); text-decoration: none; display: flex; gap:10px; align-items:center;}
+  
+  .container { max-width: 1300px; margin: 0 auto; padding: 20px; }
+  .search-box { width: 100%; max-width: 500px; margin: 0 auto 30px; position: relative; }
+  .search-box input { width: 100%; padding: 15px 20px 15px 50px; border-radius: 50px; border: 1px solid var(--border); font-size: 16px; outline: none; background: white; }
+  .search-box button { position: absolute; left: 5px; top: 5px; bottom: 5px; width: 40px; border-radius: 50%; background: var(--primary); color: white; border: none; cursor: pointer; }
+
+  .anime-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
+  .anime-card { background: var(--bg-surface); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-sm); cursor: pointer; transition: 0.3s; border: 1px solid var(--border); }
+  .anime-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+  .card-img { width: 100%; height: 240px; object-fit: cover; }
+  .card-title { padding: 15px; font-size: 15px; font-weight: 800; text-align: center; line-height:1.4; white-space: nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(5px); z-index: 2000; display: none; justify-content: center; align-items: center; padding: 15px; }
+  .modal-overlay.active { display: flex; }
+  .modal-box { background: var(--bg-surface); width: 100%; max-width: 900px; max-height: 95vh; border-radius: var(--radius-lg); display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 20px; }
+  
+  .ep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 20px; }
+  .ep-btn { padding: 15px 10px; background: var(--bg-body); border: 1px solid var(--border); border-radius: 8px; font-weight: 800; text-align: center; cursor: pointer; transition: 0.2s; font-size: 15px; }
+  .ep-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+  .ep-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+  .video-container { display: none; margin-bottom: 20px; background: #000; border-radius: var(--radius-md); overflow: hidden; position: relative; width: 100%; aspect-ratio: 16/9; }
+  .video-container video { width: 100%; height: 100%; display: block; }
+  .video-container iframe { width: 100%; height: 100%; border: none; display: block; }
+  .player-loading { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); color: white; font-weight: 800; font-size: 18px; z-index: 10; }
+
+  .loader { display: none; text-align: center; padding: 50px; font-size: 20px; font-weight: bold; color: var(--primary); }
+  .loader i { font-size: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header class="top-nav">
+  <a href="#" class="logo"><i class="fas fa-tv"></i> أنمي هيفن</a>
+</header>
+
+<div class="container">
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="ابحث عن أنمي (مثلاً: ناروتو، ون بيس)..." onkeypress="handleKeyPress(event)">
+    <button onclick="searchAnime()"><i class="fas fa-search"></i></button>
+  </div>
+
+  <div id="loader" class="loader"><i class="fas fa-spinner"></i><br>جاري البحث في المحرك...<br><span style="font-size:14px; color:var(--text-muted);">(قد يستغرق دقيقة إذا كان السيرفر نائماً)</span></div>
+
+  <div class="anime-grid" id="animeGrid">
+    <div style="grid-column: 1/-1; text-align:center; color:var(--text-muted);">اكتب اسم أنمي في الأعلى واضغط بحث للبدء.</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="episodesModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitle" style="color:var(--primary);">قائمة الحلقات</h3>
+      <button onclick="closeModal()" style="border:none; background:none; font-size:24px; cursor:pointer;"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="video-container" id="videoContainer">
+        <div class="player-loading" id="playerLoading"><i class="fas fa-spinner fa-spin"></i> جاري جلب الفيديو...</div>
+        <div id="playerWrapper"></div>
+      </div>
+      <div id="modalLoader" class="loader" style="display:none; padding:20px;"><i class="fas fa-spinner"></i> جاري جلب الحلقات...</div>
+      <div class="ep-grid" id="episodesList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_URL = "https://arabic-anime-api.onrender.com";
+  let currentAnimeId = "";
+  let currentSource = "";
+
+  async function fetchAPI(endpoint) {
+    const res = await fetch(`${API_URL}${endpoint}`);
+    if (!res.ok) throw new Error("API Error");
+    return await res.json();
+  }
+
+  async function searchAnime() {
+    const query = document.getElementById('searchInput').value.trim();
+    if(!query) return alert("اكتب اسم الأنمي أولاً!");
+    
+    const grid = document.getElementById('animeGrid');
+    const loader = document.getElementById('loader');
+    grid.innerHTML = '';
+    loader.style.display = 'block';
+
+    try {
+      const data = await fetchAPI(`/search?q=${encodeURIComponent(query)}`);
+      loader.style.display = 'none';
+      const results = data.results || [];
+
+      if (results.length === 0) {
+        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; font-size:18px; color:var(--danger);">لم يتم العثور على نتائج. تأكد من كتابة الاسم بشكل صحيح.</div>';
+        return;
+      }
+
+      results.forEach(anime => {
+        let img = anime.poster ? anime.poster : 'https://placehold.co/400x600/2563eb/ffffff?text=Anime';
+        
+        grid.innerHTML += `
+          <div class="anime-card" onclick="getEpisodes('${anime.id}', '${anime.title.replace(/'/g, "\\'")}', '${anime.source}')">
+            <img class="card-img" src="${img}" alt="${anime.title}" onerror="this.src='https://placehold.co/400x600/2563eb/ffffff?text=Anime'">
+            <div class="card-title">${anime.title}</div>
+          </div>
+        `;
+      });
+    } catch (error) {
+      loader.style.display = 'none';
+      grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--danger); font-weight:bold;">خطأ في الاتصال. (السيرفر ينام ويحتاج 50 ثانية ليستيقظ، جرب البحث مرة أخرى).</div>';
+    }
+  }
+
+  async function getEpisodes(animeId, animeTitle, source) {
+    currentAnimeId = animeId;
+    currentSource = source;
+    
+    document.getElementById('episodesModal').classList.add('active');
+    document.getElementById('modalTitle').innerText = animeTitle;
+    document.getElementById('episodesList').innerHTML = '';
+    document.getElementById('videoContainer').style.display = 'none';
+    document.getElementById('modalLoader').style.display = 'block';
+
+    try {
+      const data = await fetchAPI(`/episodes/${source}/${animeId}`);
+      document.getElementById('modalLoader').style.display = 'none';
+      const episodes = data.episodes || [];
+
+      if (data.notice) {
+        document.getElementById('episodesList').innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:15px;">${data.notice}</div>`;
+      }
+
+      if (episodes.length === 0) {
+        document.getElementById('episodesList').innerHTML = '<div style="grid-column:1/-1; text-align:center; color:red;">لا توجد حلقات متاحة لهذا الأنمي (قد يكون فيلماً).</div>';
+        return;
+      }
+
+      const epGrid = document.getElementById('episodesList');
+      episodes.forEach((ep) => {
+        epGrid.innerHTML += `
+          <div class="ep-btn" onclick="playEpisode('${ep.number}', '${ep.url}', this)">
+            الحلقة ${ep.number}
+          </div>
+        `;
+      });
+      } catch (error) {
+        document.getElementById('modalLoader').style.display = 'none';
+        document.getElementById('episodesList').innerHTML = '<div style="grid-column:1/-1; text-align:center; color:red;">حدث خطأ في جلب الحلقات.</div>';
+    }
+  }
+
+  async function playEpisode(epNum, epUrl, btnElement) {
+    document.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
+    if(btnElement) btnElement.classList.add('active');
+
+    const container = document.getElementById('videoContainer');
+    const wrapper = document.getElementById('playerWrapper');
+    const loading = document.getElementById('playerLoading');
+    
+    container.style.display = 'block';
+    loading.style.display = 'flex';
+    wrapper.innerHTML = ''; 
+
+    try {
+      let endpoint = `/watch/${currentSource}/${currentAnimeId}/${encodeURIComponent(epNum)}`;
+        
+      const data = await fetchAPI(endpoint);
+      
+      if (data.video_url) {
+        if (data.type === 'iframe') {
+          wrapper.innerHTML = `<iframe src="${data.video_url}" allowfullscreen="true" allow="autoplay; fullscreen"></iframe>`;
+          loading.style.display = 'none';
+        } else {
+          wrapper.innerHTML = `<video id="mainPlayer" controls playsinline autoplay></video>`;
+          const player = document.getElementById('mainPlayer');
+          player.src = data.video_url;
+          player.play().catch(e => { loading.style.display = 'none'; });
+          player.addEventListener('canplay', () => { loading.style.display = 'none'; });
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        loading.style.display = 'none';
+        alert(data.error || "لم يتم العثور على رابط الفيديو لهذه الحلقة.");
+      }
+    } catch (error) {
+      loading.style.display = 'none';
+      alert("حدث خطأ أثناء محاولة تشغيل الحلقة.");
+    }
+  }
+
+  function handleKeyPress(e) { if (e.key === 'Enter') searchAnime(); }
+  function closeModal() {
+    document.getElementById('episodesModal').classList.remove('active');
+    document.getElementById('playerWrapper').innerHTML = ''; 
+  }
+</script>
+</body>
+</html>

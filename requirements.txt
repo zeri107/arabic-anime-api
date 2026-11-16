@@ -1,9 +1,5 @@
 fastapi
-uvicorn
+uvicorn[standard]
 cloudscraper
 beautifulsoup4
-cloudscraper
-beautifulsoup4
-Anime3rbDL
-PyAnime4Up
-witanime_scraper
+requests
